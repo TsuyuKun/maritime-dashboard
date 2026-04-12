@@ -57,9 +57,6 @@ def get_vibrant_overlay(file_path):
 
 # --- 3. MOCK AIS DATA GENERATOR ---
 def get_heavy_ais_data():
-    # Adding 'heading' (0-360) for the arrow rotation
-    # --- MOCK AIS DATA: HIGH TRAFFIC MERAK-BAKAUHENI ---
-def get_heavy_ais_data():
     ships = [
         # --- LINTASAN AKTIF (BACK AND FORTH) ---
         {"name": "KMP Portlink", "lat": -5.925, "lon": 105.910, "type": "Ferry", "speed": 12, "heading": 285},
