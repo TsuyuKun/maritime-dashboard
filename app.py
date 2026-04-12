@@ -3,116 +3,91 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 import pydeck as pdk
+from scipy.interpolate import griddata
 
-# --- CONFIG ---
-st.set_page_config(page_title="Sunda Strait Shaded Flow", layout="wide")
+st.set_page_config(page_title="Sunda Strait Smooth Flow", layout="wide")
 
-st.title("🌊 Operational Shaded Flow Dashboard: Selat Sunda")
-st.markdown("Visualisasi Arus Permukaan (HF Radar) & Monitoring Kapal (AIS)")
-
-# --- LOAD & PROCESS DATA ---
 @st.cache_data
-def load_radar_data(file_path):
+def load_and_interpolate_data(file_path):
     ds = xr.open_dataset(file_path)
-    # Clipped Boundary Selat Sunda
+    # Clipped area
     ds = ds.sel(lat=slice(-6.1, -5.8), lon=slice(105.75, 106.05))
-    df = ds.isel(time=0).to_dataframe().reset_index()
-    df = df.dropna(subset=['u', 'v'])
+    df_raw = ds.isel(time=0).to_dataframe().reset_index().dropna(subset=['u', 'v'])
     
-    # Hitung Speed & Vektor Target untuk Flow
-    df['speed'] = np.sqrt(df['u']**2 + df['v']**2)
+    # --- PROSES INTERPOLASI (BIAR SMOOTH) ---
+    # 1. Buat grid baru yang jauh lebih rapat (High Resolution)
+    grid_res = 200 # Jumlah titik baru (makin besar makin smooth tapi berat)
+    new_lon = np.linspace(df_raw['lon'].min(), df_raw['lon'].max(), grid_res)
+    new_lat = np.linspace(df_raw['lat'].min(), df_raw['lat'].max(), grid_res)
+    grid_lon, grid_lat = np.meshgrid(new_lon, new_lat)
+
+    # 2. Interpolasi nilai u dan v ke grid baru
+    points = df_raw[['lon', 'lat']].values
+    u_interp = griddata(points, df_raw['u'].values, (grid_lon, grid_lat), method='linear')
+    v_interp = griddata(points, df_raw['v'].values, (grid_lon, grid_lat), method='linear')
     
-    # Skala panjang garis aliran (adjust jika garis terlalu pendek/panjang)
-    line_scale = 0.015 
-    df['lon_end'] = df['lon'] + (df['u'] * line_scale)
-    df['lat_end'] = df['lat'] + (df['v'] * line_scale)
+    # 3. Masukkan kembali ke DataFrame
+    df_smooth = pd.DataFrame({
+        'lon': grid_lon.flatten(),
+        'lat': grid_lat.flatten(),
+        'u': u_interp.flatten(),
+        'v': v_interp.flatten()
+    }).dropna()
     
-    # Color mapping (RGBA) - Biru ke Merah
+    df_smooth['speed'] = np.sqrt(df_smooth['u']**2 + df_smooth['v']**2)
+    
+    # Garis aliran
+    line_scale = 0.015
+    df_smooth['lon_end'] = df_smooth['lon'] + (df_smooth['u'] * line_scale)
+    df_smooth['lat_end'] = df_smooth['lat'] + (df_smooth['v'] * line_scale)
+    
     def get_color(speed):
-        # Normalisasi speed 0-2 m/s ke 0-255
-        r = int(min(255, speed * 150))
-        b = int(max(0, 255 - (speed * 150)))
-        return [r, 100, b, 160] # r, g, b, alpha
+        r = int(min(255, speed * 180))
+        b = int(max(0, 255 - (speed * 180)))
+        return [r, 50, b, 140]
 
-    df['color'] = df['speed'].apply(get_color)
-    return df
-
-# Pilih file yang ada di foldermu
-target_file = "CODAR_BADA_2025_04_12_1400-1744466400.nc"
+    df_smooth['color'] = df_smooth['speed'].apply(get_color)
+    return df_smooth
 
 try:
-    data = load_radar_data(target_file)
+    target_file = "CODAR_BADA_2025_04_12_1400-1744466400.nc"
+    data = load_and_interpolate_data(target_file)
 
-    # 1. LAYER SHADING (Heatmap agar tidak terlihat 'titik-titik')
+    # Shading Layer (Heatmap)
+    # Sekarang kita pakai radius lebih kecil tapi data lebih rapat
     shaded_layer = pdk.Layer(
         "HeatmapLayer",
         data,
         get_position=["lon", "lat"],
         get_weight="speed",
-        radius_pixels=35,
-        intensity=0.8,
-        threshold=0.05,
+        radius_pixels=25, # Radius lebih kecil biar detail kelihatan
+        intensity=0.9,
+        threshold=0.01,
         color_range=[
-            [0, 0, 255],     # Low: Biru
-            [0, 255, 255],   # Cyan
-            [0, 255, 0],     # Hijau
-            [255, 255, 0],   # Kuning
-            [255, 0, 0]      # High: Merah
+            [0, 0, 255], [0, 255, 255], [0, 255, 0], [255, 255, 0], [255, 0, 0]
         ]
     )
 
-    # 2. LAYER FLOW (Garis Arus)
+    # Flow Layer (Garis Arus)
+    # Kita sampling biar garisnya nggak numpuk banget
     flow_layer = pdk.Layer(
         "LineLayer",
-        data,
+        data.iloc[::2], 
         get_source_position=["lon", "lat"],
         get_target_position=["lon_end", "lat_end"],
         get_color="color",
-        get_width=2.5,
-        pickable=True,
+        get_width=1.5,
     )
 
-    # 3. LAYER KAPAL (AIS)
-    ais_ships = pd.DataFrame([
-        {"name": "KMP Portlink", "lon": 105.910, "lat": -5.925},
-        {"name": "KMP Sebuku", "lon": 105.860, "lat": -5.940}
-    ])
+    view = pdk.ViewState(latitude=-5.95, longitude=105.90, zoom=11)
 
-    ship_layer = pdk.Layer(
-        "ScatterplotLayer",
-        ais_ships,
-        get_position=["lon", "lat"],
-        get_radius=250,
-        get_fill_color=[255, 255, 255], # Putih agar kontras di dark mode
-        get_line_color=[255, 0, 0],
-        line_width_min_pixels=2,
-        pickable=True,
-    )
-
-    # --- VIEW STATE ---
-    view = pdk.ViewState(
-        latitude=-5.95,
-        longitude=105.90,
-        zoom=10.5,
-        pitch=0
-    )
-
-    # --- RENDER DASHBOARD ---
-    # Menggunakan gaya peta CartoDB (Gratis & No Token)
     r = pdk.Deck(
-        layers=[shaded_layer, flow_layer, ship_layer],
+        layers=[shaded_layer, flow_layer],
         initial_view_state=view,
         map_style="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-        tooltip={"text": "Kecepatan: {speed} m/s\nLokasi: {lon}, {lat}"}
     )
 
     st.pydeck_chart(r)
 
-    # Metrik
-    c1, c2 = st.columns(2)
-    c1.metric("Max Speed", f"{data['speed'].max():.2f} m/s")
-    c2.metric("Min Speed", f"{data['speed'].min():.2f} m/s")
-
 except Exception as e:
     st.error(f"Error: {e}")
-    st.info("Pastikan file .nc berada di folder yang sama dengan app.py")
