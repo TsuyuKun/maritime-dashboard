@@ -63,8 +63,7 @@ def get_heavy_ais_data():
     ]
     return ships
 
-target_file = "CODAR_BADA_2025_04_12_1400-1744466400.nc"
-
+# --- INSIDE THE MAP RENDERING SECTION ---
 ships = get_heavy_ais_data()
 
 for ship in ships:
@@ -98,22 +97,6 @@ for ship in ships:
             html=icon_html
         )
     ).add_to(m)
-
-    # 2. Tambahkan Kapal AIS (Rame)
-    for ship in ships:
-        # Tentukan warna icon berdasarkan tipe
-        color = 'red' if ship['type'] == 'Ferry' else 'blue'
-        color = 'green' if ship['type'] == 'Patrol' else color
-        color = 'orange' if ship['type'] == 'Fishing' else color
-        
-        icon_type = 'ship' if ship['speed'] > 0 else 'anchor'
-        
-        folium.Marker(
-            location=[ship['lat'], ship['lon']],
-            popup=f"<b>{ship['name']}</b><br>Type: {ship['type']}<br>Speed: {ship['speed']} kts",
-            tooltip=ship['name'],
-            icon=folium.Icon(color=color, icon=icon_type, prefix='fa')
-        ).add_to(m)
 
     # 3. Colormap
     max_val = float(np.nanmax(speed_data)) if not np.all(np.isnan(speed_data)) else 2.5
