@@ -4,3 +4,4 @@ netCDF4
 pandas
 numpy
 pydeck
+scipy
