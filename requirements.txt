@@ -2,6 +2,7 @@ streamlit
 xarray
 netCDF4
 pandas
-numpy
-pydeck
-scipy
+matplotlib
+folium
+streamlit-folium
+branca
