@@ -25,8 +25,7 @@ st.markdown("""
             height: 100vh;
         }
     </style>
-    """, unsafe_allow_stdio=True)
-
+    """, unsafe_allow_html=True)
 @st.cache_data
 def get_vibrant_overlay(file_path):
     ds = xr.open_dataset(file_path)
