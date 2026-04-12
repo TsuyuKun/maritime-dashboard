@@ -2,33 +2,25 @@ import streamlit as st
 import xarray as xr
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
+import plotly.figure_factory as ff
+import plotly.graph_objects as go
 
-# --- PAGE CONFIGURATION ---
-st.set_page_config(page_title="Sunda Strait Smart Maritime", layout="wide")
+# --- PAGE CONFIG ---
+st.set_page_config(page_title="Sunda Strait Interactive Dashboard", layout="wide")
 
-st.title("🚢 Smart Maritime Dashboard: Selat Sunda")
-st.markdown("""
-Dashboard operasional untuk monitoring **Arus Permukaan** (Radar Maritim) dan 
-**Posisi Kapal (AIS)** di wilayah strategis Selat Sunda.
-""")
+st.title("🌊 Interactive Maritime Dashboard: Sunda Strait")
+st.markdown("Zoom and hover to explore current patterns and ship positions.")
 
-# --- DATA LOADING FUNCTION ---
+# --- DATA LOADING ---
 @st.cache_data
 def load_radar_data(file_path):
     ds = xr.open_dataset(file_path)
-    # Using the first time step
     df = ds.isel(time=0).to_dataframe().reset_index()
-    # Clean NaN values (land areas)
     df = df.dropna(subset=['u', 'v'])
-    # Calculate speed magnitude (m/s)
     df['speed'] = np.sqrt(df['u']**2 + df['v']**2)
     return df
 
-# --- SIDEBAR & SELECTION ---
-st.sidebar.header("Control Panel")
-# List of files you uploaded
+# --- SIDEBAR ---
 nc_files = [
     "CODAR_BADA_2025_04_12_1400-1744466400.nc",
     "CODAR_BADA_2025_04_12_1410-1744467000.nc",
@@ -36,81 +28,76 @@ nc_files = [
     "CODAR_BADA_2025_04_12_1430-1744468200.nc",
     "CODAR_BADA_2025_04_12_1440-1744468800.nc"
 ]
-selected_file = st.sidebar.selectbox("Pilih Data Radar (.nc):", nc_files)
+selected_file = st.sidebar.selectbox("Select Radar Data:", nc_files)
 
 # Mock AIS Data
 ais_data = pd.DataFrame({
     'Ship_Name': ['KMP Portlink', 'KMP Sebuku', 'MV Dharma Rucitra'],
     'Lat': [-5.925, -5.940, -5.980],
-    'Lon': [105.910, 105.860, 105.790]
+    'Lon': [105.910, 105.860, 105.790],
+    'Type': ['Ferry', 'Ferry', 'Ro-Ro']
 })
 
-# --- PROCESSING & PLOTTING ---
 try:
-    df_radar = load_radar_data(selected_file)
+    df = load_radar_data(selected_file)
 
-    # Creating Grid for Plotting
-    lon_unique = np.sort(df_radar['lon'].unique())
-    lat_unique = np.sort(df_radar['lat'].unique())
-    Lon, Lat = np.meshgrid(lon_unique, lat_unique)
-
-    U_grid = np.full(Lon.shape, np.nan)
-    V_grid = np.full(Lat.shape, np.nan)
-    Speed_grid = np.full(Lon.shape, np.nan)
-
-    # Pivot the dataframe to grid
-    pivot_u = df_radar.pivot(index='lat', columns='lon', values='u').reindex(index=lat_unique, columns=lon_unique)
-    pivot_v = df_radar.pivot(index='lat', columns='lon', values='v').reindex(index=lat_unique, columns=lon_unique)
-    pivot_speed = df_radar.pivot(index='lat', columns='lon', values='speed').reindex(index=lat_unique, columns=lon_unique)
-
-    U_grid = pivot_u.values
-    V_grid = pivot_v.values
-    Speed_grid = pivot_speed.values
-
-    # Start Matplotlib Figure
-    fig, ax = plt.subplots(figsize=(12, 9), dpi=100)
+    # --- 1. CREATE INTERACTIVE QUIVER PLOT ---
+    # Downsample slightly for smoother interactivity (skip every 2)
+    skip = df.iloc[::2]
     
-    # Style: Background Color (Land/Sea)
-    ax.set_facecolor('#e0e0e0') # Light grey for missing data/land
+    # ff.create_quiver generates the arrows as a set of lines
+    fig = ff.create_quiver(skip['lon'], skip['lat'], skip['u'], skip['v'],
+                           scale=.05,
+                           arrow_scale=.3,
+                           name='Current Direction',
+                           line_color='black')
 
-    # Layer 1: Filled Contours (Speed)
-    levels = np.linspace(0, 2.0, 21) # Speed range 0 to 2.0 m/s
-    cf = ax.contourf(Lon, Lat, Speed_grid, levels=levels, cmap='jet', extend='both', alpha=0.9)
-    
-    # Layer 2: Quiver Plot (Current Arrows)
-    # We skip every 2 points to avoid overcrowding
-    skip = (slice(None, None, 2), slice(None, None, 2))
-    Q = ax.quiver(Lon[skip], Lat[skip], U_grid[skip], V_grid[skip], 
-                  color='black', scale=20, width=0.0025, headwidth=3)
+    # --- 2. ADD COLOR CONTOURS (SHADING) ---
+    # We add a heatmap layer behind the arrows
+    fig.add_trace(go.Contour(
+        x=df['lon'],
+        y=df['lat'],
+        z=df['speed'],
+        colorscale='Jet',
+        line_smoothing=0.8,
+        contours_coloring='heatmap',
+        name='Current Speed (m/s)',
+        colorbar=dict(title="m/s"),
+        opacity=0.8,
+        hovertemplate="Lon: %{x}<br>Lat: %{y}<br>Speed: %{z:.2f} m/s<extra></extra>"
+    ))
 
-    # Layer 3: AIS Ships
-    ax.scatter(ais_data['Lon'], ais_data['Lat'], color='white', marker='^', s=150, 
-               label='Ship (AIS)', edgecolor='black', linewidth=1.5, zorder=5)
-    
-    for i, txt in enumerate(ais_data['Ship_Name']):
-        ax.annotate(txt, (ais_data['Lon'].iloc[i], ais_data['Lat'].iloc[i]), 
-                    xytext=(5, 5), textcoords='offset points', fontweight='bold',
-                    fontsize=10, color='white', path_effects=None, zorder=6,
-                    bbox=dict(boxstyle='round,pad=0.2', fc='black', alpha=0.5))
+    # --- 3. ADD SHIPS (AIS) ---
+    fig.add_trace(go.Scatter(
+        x=ais_data['Lon'],
+        y=ais_data['Lat'],
+        mode='markers+text',
+        name='Ships (AIS)',
+        marker=dict(symbol='triangle-up', size=15, color='white', line=dict(width=2, color='black')),
+        text=ais_data['Ship_Name'],
+        textposition="top center",
+        customdata=ais_data['Type'],
+        hovertemplate="<b>%{text}</b><br>Type: %{customdata}<extra></extra>"
+    ))
 
-    # Formatting
-    ax.set_title(f"Sunda Strait Surface Current & Ship Tracking\nSource: {selected_file}", fontsize=14, fontweight='bold')
-    ax.set_xlabel("Longitude")
-    ax.set_ylabel("Latitude")
-    ax.grid(True, linestyle=':', alpha=0.6)
+    # --- LAYOUT TUNING ---
+    fig.update_layout(
+        width=1000,
+        height=700,
+        xaxis_title="Longitude",
+        yaxis_title="Latitude",
+        xaxis=dict(scaleanchor="y", scaleratio=1), # Maintain aspect ratio
+        template="plotly_white",
+        margin=dict(l=0, r=0, t=40, b=0)
+    )
 
-    # Colorbar
-    cbar = fig.colorbar(cf, ax=ax, fraction=0.03, pad=0.04)
-    cbar.set_label('Current Speed (m/s)', fontsize=12)
-
-    st.pyplot(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
     # --- METRICS ---
-    st.markdown("---")
     m1, m2, m3 = st.columns(3)
-    m1.metric("Average Speed", f"{df_radar['speed'].mean():.2f} m/s")
-    m2.metric("Max Speed", f"{df_radar['speed'].max():.2f} m/s")
-    m3.metric("Ships in Area", len(ais_data))
+    m1.metric("Avg Speed", f"{df['speed'].mean():.2f} m/s")
+    m2.metric("Max Speed", f"{df['speed'].max():.2f} m/s")
+    m3.metric("Ships Active", len(ais_data))
 
 except Exception as e:
-    st.error(f"Error: {e}. Please ensure the .nc files are in the same directory.")
+    st.error(f"Error loading data: {e}")
