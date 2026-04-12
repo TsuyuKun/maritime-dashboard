@@ -4,6 +4,7 @@ pandas>=2.2.0
 numpy>=1.26.0
 scipy>=1.13.0
 requests>=2.32.0         # AIS live fetch (AISHub / Datalastic)
+matplotlib>=3.8.0        # contourf Hs rendering (Agg backend, no display needed)
 
 # ── Optional: uncomment for production data ingestion ──────────────────────
 

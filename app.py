@@ -500,45 +500,188 @@ SHIP_SYMBOLS = {"Cargo": "square", "Passenger": "circle", "Tanker": "diamond", "
 MAPBOX_STYLE = "carto-darkmatter"
 
 
-def build_main_map(df_grid: pd.DataFrame, df_ships: pd.DataFrame) -> go.Figure:
+def _contourf_traces(df_grid: pd.DataFrame, n_levels: int) -> list:
+    """
+    Convert a scattered Hs grid into filled-contour polygon traces for Mapbox.
+
+    Strategy:
+      1. Pivot scattered points onto a regular 2-D numpy grid.
+      2. Run matplotlib.contourf() in memory (no display) to get contour paths.
+      3. Convert each filled contour polygon into a Scattermapbox trace with
+         fill="toself", giving true contourf appearance on the map.
+
+    Compatible with matplotlib >= 3.8 (uses allsegs / get_paths() rather than
+    the removed .collections attribute).
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    # ── Pivot to regular grid ────────────────────────────────────────────────
+    lons_u = np.sort(df_grid["lon"].unique())
+    lats_u = np.sort(df_grid["lat"].unique())
+    pivot  = df_grid.pivot_table(index="lat", columns="lon", values="hs", aggfunc="mean")
+    pivot  = pivot.reindex(index=lats_u, columns=lons_u)
+
+    Z   = pivot.values
+    LON = pivot.columns.values
+    LAT = pivot.index.values
+    Lon2, Lat2 = np.meshgrid(LON, LAT)
+
+    # Fill any NaNs from edge gaps after regridding
+    if np.isnan(Z).any():
+        Z = pd.DataFrame(Z).interpolate(axis=1).interpolate(axis=0).values
+
+    # ── Run contourf ─────────────────────────────────────────────────────────
+    levels = np.linspace(max(float(np.nanmin(Z)), 0.0),
+                         min(float(np.nanmax(Z)), 4.5),
+                         n_levels + 1)
+    fig_mpl, ax = plt.subplots()
+    cf = ax.contourf(Lon2, Lat2, Z, levels=levels)
+    plt.close(fig_mpl)
+
+    # Colour palette: deep blue → cyan → yellow-green → orange
+    hs_cmap_stops = [
+        (0.00, (0,   30,  100, 0.55)),
+        (0.20, (0,   90,  200, 0.60)),
+        (0.45, (0,   190, 210, 0.65)),
+        (0.70, (80,  210, 140, 0.65)),
+        (0.85, (240, 180,  30, 0.70)),
+        (1.00, (230,  60,  20, 0.75)),
+    ]
+
+    def _interp_color(t: float) -> str:
+        for i in range(len(hs_cmap_stops) - 1):
+            t0, c0 = hs_cmap_stops[i]
+            t1, c1 = hs_cmap_stops[i + 1]
+            if t0 <= t <= t1 + 1e-9:
+                f = (t - t0) / max(t1 - t0, 1e-9)
+                r = int(c0[0] + f * (c1[0] - c0[0]))
+                g = int(c0[1] + f * (c1[1] - c0[1]))
+                b = int(c0[2] + f * (c1[2] - c0[2]))
+                a = round(c0[3] + f * (c1[3] - c0[3]), 2)
+                return f"rgba({r},{g},{b},{a})"
+        r, g, b, a = hs_cmap_stops[-1][1]
+        return f"rgba({r},{g},{b},{a})"
+
+    traces = []
+
+    # Invisible dummy trace carries the colorbar
+    traces.append(
+        go.Scattermapbox(
+            lat=[None], lon=[None],
+            mode="markers",
+            marker=dict(
+                size=0,
+                color=[levels[0], levels[-1]],
+                colorscale=[[t, f"rgba({c[0]},{c[1]},{c[2]},{c[3]})"]
+                            for t, c in hs_cmap_stops],
+                cmin=float(levels[0]),
+                cmax=float(levels[-1]),
+                showscale=True,
+                colorbar=dict(
+                    title=dict(text="Hs (m)", font=dict(color="#8ab4d4", size=11)),
+                    tickfont=dict(color="#8ab4d4", size=10),
+                    x=1.01,
+                    thickness=10,
+                    len=0.5,
+                    tickvals=np.round(levels, 1).tolist(),
+                ),
+            ),
+            showlegend=False,
+            hoverinfo="skip",
+            name="Hs colorbar",
+        )
+    )
+
+    # ── Extract polygons — works on matplotlib 3.8+ ──────────────────────────
+    # allsegs[i]  = list of (N,2) ndarray, one per filled polygon in band i
+    # collections  = legacy API removed in mpl 3.10
+    n_bands = len(levels) - 1
+    if hasattr(cf, "allsegs"):
+        band_segs = cf.allsegs                          # list[list[ndarray]]
+    else:
+        # mpl < 3.8 fallback: extract vertices from Path objects
+        band_segs = [[p.vertices for p in coll.get_paths()]
+                     for coll in cf.collections]
+
+    for i, segs in enumerate(band_segs):
+        t_norm = i / max(n_bands - 1, 1)
+        fill_color = _interp_color(t_norm)
+        lo, hi = float(levels[i]), float(levels[i + 1])
+
+        for verts in segs:
+            verts = np.asarray(verts)
+            if len(verts) < 3:
+                continue
+            lons_p = verts[:, 0].tolist() + [verts[0, 0]]
+            lats_p = verts[:, 1].tolist() + [verts[0, 1]]
+
+            traces.append(
+                go.Scattermapbox(
+                    lon=lons_p,
+                    lat=lats_p,
+                    mode="lines",
+                    fill="toself",
+                    fillcolor=fill_color,
+                    line=dict(width=0.5, color=fill_color),
+                    showlegend=False,
+                    name=f"Hs {lo:.1f}–{hi:.1f} m",
+                    hovertemplate=f"Hs: {lo:.1f}–{hi:.1f} m<extra>Contourf</extra>",
+                )
+            )
+
+    return traces
+
+
+def build_main_map(
+    df_grid: pd.DataFrame,
+    df_ships: pd.DataFrame,
+    hs_mode: str = "Density (smooth)",
+    n_contours: int = 6,
+    zoom: int = 9,
+) -> go.Figure:
+    # Region centres (used when sidebar focus changes — extensible)
     lon_center = 105.85
     lat_center = -6.15
 
     fig = go.Figure()
 
-    # ── Wave height heatmap (contour fill) ──────────────────────────────────
-    pivot = df_grid.pivot_table(index="lat", columns="lon", values="hs", aggfunc="mean")
-    fig.add_trace(
-        go.Densitymapbox(
-            lat=df_grid["lat"],
-            lon=df_grid["lon"],
-            z=df_grid["hs"],
-            radius=18,
-            colorscale=[
-                [0.0, "rgba(0,60,120,0.0)"],
-                [0.3, "rgba(0,100,200,0.35)"],
-                [0.6, "rgba(0,180,255,0.55)"],
-                [1.0, "rgba(255,80,20,0.75)"],
-            ],
-            zmin=0,
-            zmax=4,
-            name="Wave Height Hs (m)",
-            showscale=True,
-            colorbar=dict(
-                title=dict(text="Hs (m)", font=dict(color="#8ab4d4", size=11)),
-                tickfont=dict(color="#8ab4d4", size=10),
-                x=1.01,
-                thickness=10,
-                len=0.5,
-            ),
-            hovertemplate="Lat: %{lat:.3f}<br>Lon: %{lon:.3f}<br>Hs: %{z:.2f} m<extra>Wave Model</extra>",
+    # ── Wave height layer ────────────────────────────────────────────────────
+    if hs_mode == "Contourf (filled contours)":
+        for tr in _contourf_traces(df_grid, n_contours):
+            fig.add_trace(tr)
+    else:
+        fig.add_trace(
+            go.Densitymapbox(
+                lat=df_grid["lat"],
+                lon=df_grid["lon"],
+                z=df_grid["hs"],
+                radius=18,
+                colorscale=[
+                    [0.0, "rgba(0,60,120,0.0)"],
+                    [0.3, "rgba(0,100,200,0.35)"],
+                    [0.6, "rgba(0,180,255,0.55)"],
+                    [1.0, "rgba(255,80,20,0.75)"],
+                ],
+                zmin=0,
+                zmax=4,
+                name="Wave Height Hs (m)",
+                showscale=True,
+                colorbar=dict(
+                    title=dict(text="Hs (m)", font=dict(color="#8ab4d4", size=11)),
+                    tickfont=dict(color="#8ab4d4", size=10),
+                    x=1.01,
+                    thickness=10,
+                    len=0.5,
+                ),
+                hovertemplate="Lat: %{lat:.3f}<br>Lon: %{lon:.3f}<br>Hs: %{z:.2f} m<extra>Wave Model</extra>",
+            )
         )
-    )
 
     # ── Current vectors (arrows via scattermapbox + quiver trick) ───────────
-    # Subsample every 2nd point for readability
     df_sub = df_grid.iloc[::3].copy()
-    scale = 0.04  # arrow length scale in degrees
+    scale = 0.04
     for _, row in df_sub.iterrows():
         speed_norm = min(row["speed"] / 2.5, 1.0)
         color = f"rgba({int(255*speed_norm)},{int(180*(1-speed_norm))},{int(255*(1-speed_norm))},0.8)"
@@ -554,7 +697,7 @@ def build_main_map(df_grid: pd.DataFrame, df_ships: pd.DataFrame) -> go.Figure:
             )
         )
 
-    # ── Risk overlay (scatter with colour coding) ────────────────────────────
+    # ── Risk overlay ─────────────────────────────────────────────────────────
     for risk_lvl in ["SAFE", "CAUTION", "DANGER"]:
         sub = df_grid[df_grid["risk"] == risk_lvl]
         if sub.empty:
@@ -577,7 +720,7 @@ def build_main_map(df_grid: pd.DataFrame, df_ships: pd.DataFrame) -> go.Figure:
             )
         )
 
-    # ── Ship icons ──────────────────────────────────────────────────────────
+    # ── Ship icons ───────────────────────────────────────────────────────────
     for ship_type, symbol in SHIP_SYMBOLS.items():
         ships_sub = df_ships[df_ships["type"] == ship_type]
         if ships_sub.empty:
@@ -609,7 +752,7 @@ def build_main_map(df_grid: pd.DataFrame, df_ships: pd.DataFrame) -> go.Figure:
         mapbox=dict(
             style=MAPBOX_STYLE,
             center=dict(lat=lat_center, lon=lon_center),
-            zoom=8.5,
+            zoom=zoom,
         ),
         margin=dict(l=0, r=0, t=0, b=0),
         height=580,
@@ -704,6 +847,18 @@ def render_sidebar():
         show_ships = st.toggle("Show AIS Ships", value=True)
         show_vectors = st.toggle("Show Current Vectors", value=True)
 
+        st.markdown('<div class="section-header">🌊 Wave Height (Hs) Display</div>', unsafe_allow_html=True)
+        hs_mode = st.radio(
+            "Hs Rendering",
+            ["Density (smooth)", "Contourf (filled contours)"],
+            index=0,
+            label_visibility="collapsed",
+        )
+        if hs_mode == "Contourf (filled contours)":
+            n_contours = st.slider("Contour levels", 4, 12, 6, 1)
+        else:
+            n_contours = 6
+
         st.markdown('<div class="section-header">📡 Data Sources</div>', unsafe_allow_html=True)
         st.markdown(
             """
@@ -731,6 +886,8 @@ def render_sidebar():
             "Focus Area",
             ["Full Strait", "Northern Entrance", "Central Narrows", "Southern Exit"],
         )
+        # Map zoom slider
+        zoom_level = st.slider("Map Zoom", min_value=7, max_value=13, value=9, step=1)
 
         st.markdown("---")
         st.markdown(
@@ -743,14 +900,14 @@ def render_sidebar():
             time.sleep(120)
             st.rerun()
 
-    return show_risk, show_ships, show_vectors, spd_thresh, hs_thresh
+    return show_risk, show_ships, show_vectors, spd_thresh, hs_thresh, hs_mode, n_contours, zoom_level
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ⑤ MAIN APP
 # ─────────────────────────────────────────────────────────────────────────────
 def main():
-    show_risk, show_ships, show_vectors, spd_thresh, hs_thresh = render_sidebar()
+    show_risk, show_ships, show_vectors, spd_thresh, hs_thresh, hs_mode, n_contours, zoom_level = render_sidebar()
 
     # Header ─────────────────────────────────────────────────────────────────
     col_h1, col_h2, col_h3 = st.columns([5, 2, 1])
@@ -850,8 +1007,29 @@ def main():
     col_map, col_side = st.columns([3, 1])
     with col_map:
         st.markdown('<div class="section-header">🗺️ Live Maritime Chart — Sunda Strait</div>', unsafe_allow_html=True)
-        fig_map = build_main_map(df_grid, df_ships)
-        st.plotly_chart(fig_map, use_container_width=True, config={"scrollZoom": True, "displayModeBar": False})
+        fig_map = build_main_map(df_grid, df_ships, hs_mode=hs_mode, n_contours=n_contours, zoom=zoom_level)
+        st.plotly_chart(
+            fig_map,
+            use_container_width=True,
+            config={
+                "scrollZoom": True,
+                "displayModeBar": True,
+                "modeBarButtonsToRemove": [
+                    "select2d", "lasso2d", "autoScale2d",
+                    "hoverClosestCartesian", "hoverCompareCartesian",
+                    "toggleSpikelines",
+                ],
+                "modeBarButtonsToAdd": ["zoomInGeo", "zoomOutGeo", "resetGeo"],
+                "displaylogo": False,
+                "toImageButtonOptions": {
+                    "format": "png",
+                    "filename": "sunda_strait_maritime_chart",
+                    "height": 800,
+                    "width": 1400,
+                    "scale": 2,
+                },
+            },
+        )
 
     with col_side:
         # AIS table
