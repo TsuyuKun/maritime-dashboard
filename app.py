@@ -61,7 +61,6 @@ def get_heavy_ais_data():
         # --- LINTASAN AKTIF (BACK AND FORTH) ---
         {"name": "KMP Portlink", "lat": -5.925, "lon": 105.910, "type": "Ferry", "speed": 12, "heading": 285},
         {"name": "KMP Sebuku", "lat": -5.935, "lon": 105.880, "type": "Ferry", "speed": 10, "heading": 105},
-        {"name": "KMP Batumandi", "lat": -5.945, "lon": 105.850, "type": "Ferry", "speed": 11, "heading": 280},
         {"name": "KMP Legundi", "lat": -5.915, "lon": 105.930, "type": "Ferry", "speed": 13, "heading": 110},
         {"name": "KMP Jatra III", "lat": -5.930, "lon": 105.820, "type": "Ferry", "speed": 14, "heading": 100},
         {"name": "KMP Labitra Adinda", "lat": -5.940, "lon": 105.800, "type": "Ferry", "speed": 11, "heading": 95},
@@ -85,7 +84,6 @@ def get_heavy_ais_data():
         
         # --- PENJAGA LAUT / PATROLI ---
         {"name": "KN Trisula (PPLP)", "lat": -5.980, "lon": 105.950, "type": "Patrol", "speed": 22, "heading": 340},
-        {"name": "KM Nelayan Maju", "lat": -6.020, "lon": 106.020, "type": "Fishing", "speed": 4, "heading": 45},
     ]
     return ships
 
