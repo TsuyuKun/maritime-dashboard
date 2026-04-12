@@ -61,13 +61,11 @@ def get_heavy_ais_data():
     ships = [
         {"name": "KMP Portlink", "lat": -5.925, "lon": 105.910, "type": "Ferry", "speed": 12, "heading": 285},
         {"name": "KMP Sebuku", "lat": -5.935, "lon": 105.880, "type": "Ferry", "speed": 10, "heading": 105},
-        {"name": "KMP Batumandi", "lat": -5.945, "lon": 105.850, "type": "Ferry", "speed": 11, "heading": 280},
         {"name": "KMP Legundi", "lat": -5.915, "lon": 105.930, "type": "Ferry", "speed": 13, "heading": 110},
         {"name": "MT Martha Petrol", "lat": -5.850, "lon": 105.800, "type": "Tanker", "speed": 8, "heading": 210},
         {"name": "MV Ocean Voyager", "lat": -6.050, "lon": 105.750, "type": "Cargo", "speed": 15, "heading": 30},
         {"name": "CMA CGM Jakarta", "lat": -6.120, "lon": 105.850, "type": "Container", "speed": 18, "heading": 15},
         {"name": "KN Trisula", "lat": -5.980, "lon": 105.950, "type": "Patrol", "speed": 22, "heading": 180},
-        {"name": "KM Nelayan Maju", "lat": -6.020, "lon": 106.020, "type": "Fishing", "speed": 4, "heading": 45},
     ]
     return ships
 
@@ -120,7 +118,7 @@ try:
         
         folium.Marker(
             location=[ship['lat'], ship['lon']],
-            popup=f"<b>{ship['name']}</b><br>HDG: {ship['heading']}°<br>SPD: {ship['speed']} kts",
+            popup=f"<b>{ship['name']}</b><br>Heading: {ship['heading']}°<br>Speed: {ship['speed']} kts",
             tooltip=ship['name'],
             icon=folium.DivIcon(
                 icon_size=(30, 30),
