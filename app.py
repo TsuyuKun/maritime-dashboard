@@ -10,7 +10,7 @@ import PIL.Image
 import pandas as pd
 
 # --- 1. PAGE CONFIGURATION & FULL SCREEN CSS ---
-st.set_page_config(page_title="Sunda Strait Command Center", layout="wide")
+st.set_page_config(page_title="Dashboard Maritim", layout="wide")
 
 # This CSS hides the Streamlit UI and forces the map to be full screen
 st.markdown("""
