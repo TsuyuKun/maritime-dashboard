@@ -2,6 +2,5 @@ streamlit
 xarray
 netCDF4
 pandas
-matplotlib
 numpy
-pyproj
+pydeck
