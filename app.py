@@ -58,14 +58,37 @@ def get_vibrant_overlay(file_path):
 # --- 3. MOCK AIS DATA GENERATOR ---
 def get_heavy_ais_data():
     # Adding 'heading' (0-360) for the arrow rotation
+    # --- MOCK AIS DATA: HIGH TRAFFIC MERAK-BAKAUHENI ---
+def get_heavy_ais_data():
     ships = [
+        # --- LINTASAN AKTIF (BACK AND FORTH) ---
         {"name": "KMP Portlink", "lat": -5.925, "lon": 105.910, "type": "Ferry", "speed": 12, "heading": 285},
         {"name": "KMP Sebuku", "lat": -5.935, "lon": 105.880, "type": "Ferry", "speed": 10, "heading": 105},
+        {"name": "KMP Batumandi", "lat": -5.945, "lon": 105.850, "type": "Ferry", "speed": 11, "heading": 280},
         {"name": "KMP Legundi", "lat": -5.915, "lon": 105.930, "type": "Ferry", "speed": 13, "heading": 110},
+        {"name": "KMP Jatra III", "lat": -5.930, "lon": 105.820, "type": "Ferry", "speed": 14, "heading": 100},
+        {"name": "KMP Labitra Adinda", "lat": -5.940, "lon": 105.800, "type": "Ferry", "speed": 11, "heading": 95},
+        {"name": "KMP Rishel", "lat": -5.922, "lon": 105.890, "type": "Ferry", "speed": 12, "heading": 275},
+        {"name": "KMP Amadea", "lat": -5.938, "lon": 105.865, "type": "Ferry", "speed": 10, "heading": 108},
+        
+        # --- ANTRIAN / SEKITAR PELABUHAN MERAK ---
+        {"name": "KMP Rajabasa (Docking)", "lat": -5.932, "lon": 105.995, "type": "Ferry", "speed": 0, "heading": 45},
+        {"name": "Tugboat Merak I", "lat": -5.935, "lon": 105.990, "type": "Patrol", "speed": 2, "heading": 0},
+        {"name": "Tugboat Merak II", "lat": -5.930, "lon": 106.000, "type": "Patrol", "speed": 1, "heading": 90},
+        
+        # --- ANTRIAN / SEKITAR PELABUHAN BAKAUHENI ---
+        {"name": "KMP Windu Karsa Pratama", "lat": -5.870, "lon": 105.760, "type": "Ferry", "speed": 0, "heading": 220},
+        {"name": "KMP Neomi", "lat": -5.865, "lon": 105.755, "type": "Ferry", "speed": 1, "heading": 180},
+        
+        # --- KAPAL LOGISTIK & TANKER DI ALKI I ---
         {"name": "MT Martha Petrol", "lat": -5.850, "lon": 105.800, "type": "Tanker", "speed": 8, "heading": 210},
         {"name": "MV Ocean Voyager", "lat": -6.050, "lon": 105.750, "type": "Cargo", "speed": 15, "heading": 30},
         {"name": "CMA CGM Jakarta", "lat": -6.120, "lon": 105.850, "type": "Container", "speed": 18, "heading": 15},
-        {"name": "KN Trisula", "lat": -5.980, "lon": 105.950, "type": "Patrol", "speed": 22, "heading": 180},
+        {"name": "Maersk Sunda", "lat": -5.780, "lon": 105.980, "type": "Container", "speed": 16, "heading": 195},
+        
+        # --- PENJAGA LAUT / PATROLI ---
+        {"name": "KN Trisula (PPLP)", "lat": -5.980, "lon": 105.950, "type": "Patrol", "speed": 22, "heading": 340},
+        {"name": "KM Nelayan Maju", "lat": -6.020, "lon": 106.020, "type": "Fishing", "speed": 4, "heading": 45},
     ]
     return ships
 
@@ -126,6 +149,15 @@ try:
                 html=icon_html
             )
         ).add_to(m)
+        
+                # Menambahkan garis putus-putus rute penyeberangan
+        folium.PolyLine(
+            locations=[[-5.93, 106.00], [-5.87, 105.76]],
+            color="white",
+            weight=2,
+            opacity=0.5,
+            dash_array='10, 10'
+        ).add_to(m)
 
     # Layer 3: Dynamic Colormap (Turbo scale)
     max_val = float(np.nanmax(speed_data)) if not np.all(np.isnan(speed_data)) else 2.5
@@ -137,7 +169,7 @@ try:
     colormap.add_to(m)
 
     # Render to Streamlit
-    folium_static(m, width=1450, height=850)
+    folium_static(m, width=1850, height=850)
 
 except Exception as e:
     st.error(f"Operational Error: {e}")
