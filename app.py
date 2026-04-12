@@ -62,10 +62,15 @@ try:
         zindex=1
     ).add_to(m)
 
-    # Menambahkan Legend (Colorbar)
-    colormap = cm.LinearColormap(colors=['blue', 'cyan', 'green', 'yellow', 'red'], 
-                                 vmin=0, vmax=np.nanmax(speed_data),
-                                 caption='Kecepatan Arus (m/s)')
+    max_speed = float(np.nanmax(speed_data)) if not np.all(np.isnan(speed_data)) else 2.0
+    
+    # 2. Saat membuat colormap, gunakan max_speed yang sudah dipastikan tipenya
+    colormap = cm.LinearColormap(
+        colors=['blue', 'cyan', 'green', 'yellow', 'red'], 
+        vmin=0, 
+        vmax=max_speed,
+        caption='Kecepatan Arus (m/s)'
+    )
     colormap.add_to(m)
 
     # Tambah Kapal AIS
