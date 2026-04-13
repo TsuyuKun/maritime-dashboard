@@ -117,4 +117,4 @@ for s in ships_data:
     m.get_root().script.add_child(folium.Element(click_js))
 
 # Render ke Streamlit
-folium_static(m, width=1550, height=900
+folium_static(m, width=1550, height=900)
