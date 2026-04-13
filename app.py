@@ -60,7 +60,8 @@ ships_data = [
         "past": [[-5.93, 106.00], [-5.91, 105.90]],
         "timeline": [{"time": "10:30", "pos": [-5.89, 105.83], "cond": "🌧️ Hujan"}, {"time": "10:45", "pos": [-5.87, 105.76], "cond": "☁️ Tebal"}]
     },
-    "name": "CAO NI MA 2", 
+    {
+        "name": "CAO NI MA 2", 
         "type": "Cargo", 
         "color": "#f1c40f", 
         "lat": -5.97, 
