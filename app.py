@@ -7,164 +7,139 @@ from streamlit_folium import folium_static
 import branca.colormap as cm
 from io import BytesIO
 import PIL.Image
-import pandas as pd
+import plotly.graph_objects as go
 
-# --- 1. PAGE CONFIGURATION & FULL SCREEN CSS ---
-st.set_page_config(page_title="Dashboard Maritim", layout="wide")
+# --- 1. CONFIG & UI STYLING ---
+st.set_page_config(page_title="Maritime FlightDoc Dashboard", layout="wide")
 
-# This CSS hides the Streamlit UI and forces the map to be full screen
+# CSS untuk Command Center Look (Full Screen)
 st.markdown("""
     <style>
-        .block-container { padding: 0rem; }
+        .block-container { padding: 0rem; background-color: #000000; }
         iframe { width: 100vw; height: 100vh; }
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
-        .stApp { bottom: 0; }
+        .stMetric { background-color: #111; padding: 10px; border-radius: 5px; border: 1px solid #333; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. DATA PROCESSING (SHADED OVERLAY) ---
+# --- 2. DATA ENGINE (Radar & Route) ---
 @st.cache_data
-def get_vibrant_overlay(file_path):
-    # Load dataset
+def load_and_process_radar(file_path):
     ds = xr.open_dataset(file_path)
+    # Clip Boundary: Fokus Selat Sunda
+    ds_clipped = ds.sel(lat=slice(-6.2, -5.7), lon=slice(105.7, 106.1))
     
-    # Clip Boundary: Focusing specifically on the Sunda Strait crossing area
-    ds = ds.sel(lat=slice(-6.2, -5.7), lon=slice(105.7, 106.1))
+    lon, lat = ds_clipped.lon.values, ds_clipped.lat.values
+    speed = np.sqrt(ds_clipped.u.isel(time=0).values**2 + ds_clipped.v.isel(time=0).values**2)
     
-    lon, lat = ds.lon.values, ds.lat.values
-    u = ds.u.isel(time=0).values
-    v = ds.v.isel(time=0).values
-    speed = np.sqrt(u**2 + v**2)
-    
-    # Render High-Quality Flattened Shading
+    # Render Shading ke PNG (Flattening)
     fig, ax = plt.subplots(figsize=(15, 15))
     fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
     ax.axis('off')
-    
-    # Using 'turbo' colormap for high-visibility operasional shading
     ax.imshow(speed, extent=[lon.min(), lon.max(), lat.min(), lat.max()], 
-               origin='lower', cmap='turbo', alpha=0.8, interpolation='bilinear')
+               origin='lower', cmap='turbo', alpha=0.75, interpolation='bilinear')
     
     buf = BytesIO()
     plt.savefig(buf, format='png', transparent=True, dpi=200)
     plt.close(fig)
     
-    # Standardize bounds for JSON serialization
     bounds = [float(lat.min()), float(lon.min()), float(lat.max()), float(lon.max())]
-    return buf, bounds, speed
+    return buf, bounds, ds_clipped
 
-# --- 3. MOCK AIS DATA GENERATOR ---
-def get_heavy_ais_data():
-    ships = [
-        # --- LINTASAN AKTIF (BACK AND FORTH) ---
-        {"name": "KMP Portlink", "lat": -5.925, "lon": 105.910, "type": "Ferry", "speed": 12, "heading": 285},
-        {"name": "KMP Sebuku", "lat": -5.935, "lon": 105.880, "type": "Ferry", "speed": 10, "heading": 105},
-        {"name": "KMP Legundi", "lat": -5.915, "lon": 105.930, "type": "Ferry", "speed": 13, "heading": 110},
-        {"name": "KMP Jatra III", "lat": -5.930, "lon": 105.820, "type": "Ferry", "speed": 14, "heading": 100},
-        {"name": "KMP Labitra Adinda", "lat": -5.940, "lon": 105.800, "type": "Ferry", "speed": 11, "heading": 95},
-        {"name": "KMP Rishel", "lat": -5.922, "lon": 105.890, "type": "Ferry", "speed": 12, "heading": 275},
-        {"name": "KMP Amadea", "lat": -5.938, "lon": 105.865, "type": "Ferry", "speed": 10, "heading": 108},
-        
-        # --- ANTRIAN / SEKITAR PELABUHAN MERAK ---
-        {"name": "KMP Rajabasa (Docking)", "lat": -5.932, "lon": 105.995, "type": "Ferry", "speed": 0, "heading": 45},
-        {"name": "Tugboat Merak I", "lat": -5.935, "lon": 105.990, "type": "Patrol", "speed": 2, "heading": 0},
-        {"name": "Tugboat Merak II", "lat": -5.930, "lon": 106.000, "type": "Patrol", "speed": 1, "heading": 90},
-        
-        # --- ANTRIAN / SEKITAR PELABUHAN BAKAUHENI ---
-        {"name": "KMP Windu Karsa Pratama", "lat": -5.870, "lon": 105.760, "type": "Ferry", "speed": 0, "heading": 220},
-        {"name": "KMP Neomi", "lat": -5.865, "lon": 105.755, "type": "Ferry", "speed": 1, "heading": 180},
-        
-        # --- KAPAL LOGISTIK & TANKER DI ALKI I ---
-        {"name": "MT Martha Petrol", "lat": -5.850, "lon": 105.800, "type": "Tanker", "speed": 8, "heading": 210},
-        {"name": "MV Ocean Voyager", "lat": -6.050, "lon": 105.750, "type": "Cargo", "speed": 15, "heading": 30},
-        {"name": "CMA CGM Jakarta", "lat": -6.120, "lon": 105.850, "type": "Container", "speed": 18, "heading": 15},
-        {"name": "Maersk Sunda", "lat": -5.780, "lon": 105.980, "type": "Container", "speed": 16, "heading": 195},
-        
-        # --- PENJAGA LAUT / PATROLI ---
-        {"name": "KN Trisula (PPLP)", "lat": -5.980, "lon": 105.950, "type": "Patrol", "speed": 22, "heading": 340},
+def get_unique_route_profile(ds, start_pos, end_pos, steps=40):
+    """Menghitung profil arus di sepanjang rute spesifik kapal"""
+    lats = np.linspace(start_pos[0], end_pos[0], steps)
+    lons = np.linspace(start_pos[1], end_pos[1], steps)
+    
+    route_speeds = []
+    for i in range(steps):
+        # Sampling data terdekat di grid radar
+        p = ds.sel(lat=lats[i], lon=lons[i], method="nearest")
+        s = np.sqrt(p.u.isel(time=0).values**2 + p.v.isel(time=0).values**2)
+        route_speeds.append(float(s))
+    return route_speeds
+
+# --- 3. MOCK VOYAGE DATA (AIS) ---
+def get_voyage_data():
+    return [
+        {"name": "KMP Portlink", "lat": -5.925, "lon": 105.910, "dest": "Bakauheni", "dest_pos": [-5.87, 105.76], "heading": 285, "type": "Ferry", "wind": "12 kts"},
+        {"name": "KMP Sebuku", "lat": -5.935, "lon": 105.880, "dest": "Merak", "dest_pos": [-5.93, 106.00], "heading": 105, "type": "Ferry", "wind": "10 kts"},
+        {"name": "KMP Batumandi", "lat": -5.945, "lon": 105.850, "dest": "Bakauheni", "dest_pos": [-5.87, 105.76], "heading": 280, "type": "Ferry", "wind": "14 kts"},
     ]
-    return ships
 
-# --- 4. MAIN APP LOGIC ---
+# --- 4. MAIN APP ---
 target_file = "CODAR_BADA_2025_04_12_1400-1744466400.nc"
 
 try:
-    # Process Data
-    img_buf, bounds, speed_data = get_vibrant_overlay(target_file)
-    ships = get_heavy_ais_data()
+    img_buf, bounds, ds_radar = load_and_process_radar(target_file)
+    ships = get_voyage_data()
+
+    # --- SIDEBAR: MARITIME FLIGHTDOC ---
+    with st.sidebar:
+        st.title("📋 FlightDoc")
+        selected_name = st.selectbox("Select Vessel for Briefing:", [s['name'] for s in ships])
+        ship = next(s for s in ships if s['name'] == selected_name)
+        
+        st.markdown(f"**Target:** {ship['dest']} | **ETA:** 10:45 UTC")
+        
+        # Hitung Route Forecast unik
+        route_profile = get_unique_route_profile(ds_radar, [ship['lat'], ship['lon']], ship['dest_pos'])
+        
+        # Plotly Profile Chart
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(y=route_profile, fill='tozeroy', line=dict(color='#00f2ff', width=3)))
+        fig.update_layout(
+            title="Current Load Profile (En-route)",
+            xaxis_title="Route Progress (%)", yaxis_title="Current (m/s)",
+            template="plotly_dark", height=250, margin=dict(l=10, r=10, t=40, b=10)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # FlightDoc Metrics
+        c1, c2 = st.columns(2)
+        c1.metric("Avg Current", f"{np.mean(route_profile):.2f} m/s")
+        c2.metric("Wind Feed", ship['wind'])
+        
+        st.warning(f"🚩 **Briefing:** Peak current at middle passage. Anticipate drift toward North-East.")
+
+    # --- MAIN MAP ---
+    m = folium.Map(location=[-5.94, 105.88], zoom_start=11, tiles="CartoDB dark_matter")
     
-    # Initialize Folium Map (Free Basemap)
-    m = folium.Map(
-        location=[-5.95, 105.9], 
-        zoom_start=11, 
-        tiles="CartoDB dark_matter",
-        zoom_control=True
-    )
-    
-    # Layer 1: Flattened Current Shading
+    # 1. Layer Arus
     img = PIL.Image.open(img_buf)
     folium.raster_layers.ImageOverlay(
-        image=np.array(img),
-        bounds=[[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
-        opacity=0.85,
-        zindex=1
+        image=np.array(img), bounds=[[bounds[0], bounds[1]], [bounds[2], bounds[3]]],
+        opacity=0.8, zindex=1
     ).add_to(m)
 
-    # Layer 2: Directional AIS Arrows
-    for ship in ships:
-        # Define color based on ship type
-        ship_color = '#ff0000' if ship['type'] == 'Ferry' else '#00ccff'
-        if ship['type'] == 'Patrol': ship_color = '#00ff00'
+    # 2. Layer Kapal & Jalur Spesifik
+    for s in ships:
+        # Garis lintasan unik kapal (Flight Path)
+        folium.PolyLine(
+            locations=[[s['lat'], s['lon']], s['dest_pos']],
+            color="#00f2ff", weight=1.5, opacity=0.4, dash_array='5, 10'
+        ).add_to(m)
         
-        # CSS DivIcon to rotate the arrow based on heading
-        icon_html = f"""
-            <div style="
-                transform: rotate({ship['heading']}deg);
-                color: {ship_color};
-                font-size: 24px;
-                font-weight: bold;
-                text-shadow: 1px 1px 2px #000;
-                width: 30px;
-                height: 30px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            ">➤</div>
-        """
+        # Arrow Marker (Heading aware)
+        icon_color = "#FF4B4B" if s['name'] == selected_name else "#555"
+        icon_html = f'<div style="transform: rotate({s["heading"]}deg); color: {icon_color}; font-size: 26px; text-shadow: 1px 1px 2px #000;">➤</div>'
         
         folium.Marker(
-            location=[ship['lat'], ship['lon']],
-            popup=f"<b>{ship['name']}</b><br>Heading: {ship['heading']}°<br>Speed: {ship['speed']} kts",
-            tooltip=ship['name'],
-            icon=folium.DivIcon(
-                icon_size=(30, 30),
-                icon_anchor=(15, 15),
-                html=icon_html
-            )
-        ).add_to(m)
-        
-                # Menambahkan garis putus-putus rute penyeberangan
-        folium.PolyLine(
-            locations=[[-5.93, 106.00], [-5.87, 105.76]],
-            color="white",
-            weight=2,
-            opacity=0.5,
-            dash_array='10, 10'
+            location=[s['lat'], s['lon']],
+            tooltip=f"{s['name']} (To: {s['dest']})",
+            icon=folium.DivIcon(icon_size=(30,30), icon_anchor=(15,15), html=icon_html)
         ).add_to(m)
 
-    # Layer 3: Dynamic Colormap (Turbo scale)
-    max_val = float(np.nanmax(speed_data)) if not np.all(np.isnan(speed_data)) else 2.5
+    # 3. Colormap Legend
     colormap = cm.LinearColormap(
         colors=['#30123b', '#4145ab', '#4672f1', '#2eb67d', '#f8e621', '#c72200'], 
-        vmin=0, vmax=max_val,
-        caption='Surface Current Speed (m/s)'
+        vmin=0, vmax=2.0, caption='Surface Velocity (m/s)'
     )
     colormap.add_to(m)
 
-    # Render to Streamlit
-    folium_static(m, width=1850, height=850)
+    folium_static(m, width=1450, height=850)
 
 except Exception as e:
-    st.error(f"Operational Error: {e}")
+    st.error(f"System Error: {e}")
