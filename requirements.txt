@@ -2,7 +2,9 @@ streamlit
 xarray
 netCDF4
 pandas
-matplotlib
+numpy
 folium
 streamlit-folium
 branca
+Pillow
+plotly
