@@ -44,7 +44,7 @@ ports = [
 
 ships_data = [
     {
-        "name": "KMP SEBUKU", "type": "Ferry", "color": "#00f2ff", "lat": -5.85, "lon": 105.82, 
+        "name": "KMP SEBUKU", "type": "Ferry", "color": "#00f2ff", "lat": -5.89, "lon": 105.82, 
         "speed": "10.8 kn", "course": 355, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
         "past": [[-5.87, 105.77], [-5.89, 105.82]],
         "timeline": [
@@ -55,7 +55,7 @@ ships_data = [
         ]
     },
     {
-        "name": "MV PORTLINK", "type": "Ro-Ro", "color": "#2ecc71", "lat": -5.86, "lon": 105.90, 
+        "name": "MV PORTLINK", "type": "Ro-Ro", "color": "#2ecc71", "lat": -5.91, "lon": 105.90, 
         "speed": "12.5 kn", "course": 200, "eta": "10:45 UTC", "dest": "BAKAUHENI", "dest_pos": [-5.87, 105.76],
         "past": [[-5.93, 106.00], [-5.91, 105.90]],
         "timeline": [{"time": "10:30", "pos": [-5.89, 105.83], "cond": "🌧️ Hujan"}, {"time": "10:45", "pos": [-5.87, 105.76], "cond": "☁️ Tebal"}]
@@ -70,7 +70,7 @@ ships_data = [
         "course": 210, 
         "eta": "N/A", 
         "dest": "FREMANTLE (AUS)", # Update Destinasi
-        "dest_pos": [-32.05, 115.74], # Koordinat Fremantle
+        "dest_pos": [-7.50, 105.00], # Koordinat Fremantle
         "past": [
             [1.29, 103.85],   # Keberangkatan: Singapura
             [-5.50, 105.90],  # Titik transit Selat Sunda Utara
