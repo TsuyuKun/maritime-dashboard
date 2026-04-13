@@ -8,7 +8,7 @@ import PIL.Image
 from io import BytesIO
 
 # --- 1. CONFIG ---
-st.set_page_config(page_title="Maritime FlightDoc Pro", layout="wide")
+st.set_page_config(page_title="Sunda Strait Crossing Maritime Dashboard", layout="wide")
 
 st.markdown("""
     <style>
@@ -45,9 +45,14 @@ ports = [
 ships_data = [
     {
         "name": "KMP SEBUKU", "type": "Ferry", "color": "#00f2ff", "lat": -5.89, "lon": 105.82, 
-        "speed": "10.8 kn", "course": 115, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
+        "speed": "10.8 kn", "course": 320, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
         "past": [[-5.87, 105.77], [-5.89, 105.82]],
-        "timeline": [{"time": "10:30", "pos": [-5.90, 105.86], "cond": "🌧️ Hujan"}, {"time": "11:15", "pos": [-5.93, 106.00], "cond": "☀️ Cerah"}]
+        "timeline": [
+            {"time": "10:30", "pos": [-5.90, 105.86], "cond": "🌧️ Hujan"},
+            {"time": "10:45", "pos": [-5.91, 105.91], "cond": "☁️ Tebal"},
+            {"time": "11:00", "pos": [-5.92, 105.95], "cond": "⛅ Berawan"},
+            {"time": "11:15", "pos": [-5.93, 106.00], "cond": "☀️ Cerah"}
+        ]
     },
     {
         "name": "MV PORTLINK", "type": "Ro-Ro", "color": "#2ecc71", "lat": -5.91, "lon": 105.90, 
