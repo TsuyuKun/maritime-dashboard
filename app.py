@@ -123,4 +123,16 @@ script_content = ""
 for obj in js_objects:
     script_content += f"""
     {obj['marker']}.on('click', function() {{
-        {[f"map
+        {[f"map.removeLayer({wid});" for wid in all_wp_ids]}
+        {[f"{rid}.setStyle({{color: '#3498db', weight: 3, dashArray: '10, 10'}});" for rid in all_route_ids]}
+        map.addLayer({obj['wp']});
+        {obj['route']}.setStyle({{color: '#00f2ff', weight: 5, dashArray: null}});
+    }});
+    """
+
+m.get_root().script.add_child(folium.Element(f"""
+    var map = {m.get_name()};
+    {script_content.replace('[', '').replace(']', '').replace("'", "")}
+"""))
+
+folium_static(m, width=1550, height=900)
