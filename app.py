@@ -39,7 +39,7 @@ def get_shaded_radar(file_path):
 ports = [
     {"name": "Pelabuhan Merak", "pos": [-5.93, 106.00]},
     {"name": "Pelabuhan Bakauheni", "pos": [-5.87, 105.76]},
-    {"name": "Pelabuhan Bojonegara", "pos": [-5.95, 106.09]}
+    {"name": "Pelabuhan Bojonegara", "pos": [-5.975, 106.10]}
 ]
 
 ships_data = [
@@ -67,7 +67,7 @@ ships_data = [
         "lat": -6.10, 
         "lon": 105.80, 
         "speed": "14.2 kn", 
-        "course": 210, 
+        "course": 130, 
         "eta": "N/A", 
         "dest": "FREMANTLE (AUS)", # Update Destinasi
         "dest_pos": [-7.50, 105.00], # Koordinat Fremantle
