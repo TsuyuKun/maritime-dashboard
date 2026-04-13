@@ -45,7 +45,7 @@ ports = [
 ships_data = [
     {
         "name": "KMP SEBUKU", "type": "Ferry", "color": "#00f2ff", "lat": -5.89, "lon": 105.82, 
-        "speed": "10.8 kn", "course": 320, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
+        "speed": "10.8 kn", "course": 340, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
         "past": [[-5.87, 105.77], [-5.89, 105.82]],
         "timeline": [
             {"time": "10:30", "pos": [-5.90, 105.86], "cond": "🌧️ Hujan"},
@@ -56,15 +56,33 @@ ships_data = [
     },
     {
         "name": "MV PORTLINK", "type": "Ro-Ro", "color": "#2ecc71", "lat": -5.91, "lon": 105.90, 
-        "speed": "12.5 kn", "course": 290, "eta": "10:45 UTC", "dest": "BAKAUHENI", "dest_pos": [-5.87, 105.76],
+        "speed": "12.5 kn", "course": 200, "eta": "10:45 UTC", "dest": "BAKAUHENI", "dest_pos": [-5.87, 105.76],
         "past": [[-5.93, 106.00], [-5.91, 105.90]],
         "timeline": [{"time": "10:30", "pos": [-5.89, 105.83], "cond": "🌧️ Hujan"}, {"time": "10:45", "pos": [-5.87, 105.76], "cond": "☁️ Tebal"}]
     },
     {
-        "name": "MT OCEAN PRIDE", "type": "Tanker", "color": "#e74c3c", "lat": -6.10, "lon": 105.80, 
-        "speed": "14.2 kn", "course": 210, "eta": "N/A", "dest": "AUSTRALIA", "dest_pos": [-6.50, 105.50],
-        "past": [[-6.00, 105.85], [-6.10, 105.80]],
-        "timeline": [{"time": "12:00", "pos": [-6.25, 105.70], "cond": "⛅ Berawan"}]
+        "name": "MT OCEAN PRIDE", 
+        "type": "Tanker", 
+        "color": "#e74c3c", 
+        "lat": -6.10, 
+        "lon": 105.80, 
+        "speed": "14.2 kn", 
+        "course": 210, 
+        "eta": "N/A", 
+        "dest": "FREMANTLE (AUS)", # Update Destinasi
+        "dest_pos": [-32.05, 115.74], # Koordinat Fremantle
+        "past": [
+            [1.29, 103.85],   # Keberangkatan: Singapura
+            [-5.50, 105.90],  # Titik transit Selat Sunda Utara
+            [-6.00, 105.85], 
+            [-6.10, 105.80]
+        ],
+        "timeline": [
+            {"time": "12:00", "pos": [-6.25, 105.70], "cond": "⛅ Berawan"},
+            {"time": "12:15", "pos": [-6.35, 105.62], "cond": "☁️ Tebal"},
+            {"time": "12:30", "pos": [-6.45, 105.55], "cond": "🌧️ Hujan Ringan"},
+            {"time": "12:45", "pos": [-6.55, 105.48], "cond": "☀️ Cerah"}
+        ]
     },
     {
         "name": "KM LOGISTIK 1", "type": "Cargo", "color": "#f1c40f", "lat": -5.98, "lon": 106.05, 
