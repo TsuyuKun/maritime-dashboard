@@ -35,17 +35,20 @@ def get_shaded_radar(file_path):
         return buf, [float(lat.min()), float(lon.min()), float(lat.max()), float(lon.max())]
     except: return None, None
 
-# --- 3. MOCK DATA ---
+# --- 3. MOCK DATA PELABUHAN & KAPAL ---
+ports = [
+    {"name": "Pelabuhan Merak", "pos": [-5.93, 106.00]},
+    {"name": "Pelabuhan Bakauheni", "pos": [-5.87, 105.76]},
+    {"name": "Pelabuhan Bojonegara", "pos": [-5.91, 106.09]}
+]
+
 ships_data = [
     {
         "name": "KMP_SEBUKU", "type": "Ferry", "lat": -5.89, "lon": 105.82, "speed": "10.8 kn", "course": 115, "eta": "11:15 UTC",
         "dest": "MERAK", "dest_pos": [-5.93, 106.00],
-        # Tambahan Past Track
         "past_track": [[-5.87, 105.77], [-5.88, 105.79], [-5.89, 105.82]],
         "timeline": [
             {"time": "10:30", "pos": [-5.90, 105.86], "cond": "🌧️ Hujan"},
-            {"time": "10:45", "pos": [-5.91, 105.91], "cond": "☁️ Tebal"},
-            {"time": "11:00", "pos": [-5.92, 105.96], "cond": "⛅ Berawan"},
             {"time": "11:15", "pos": [-5.93, 106.00], "cond": "☀️ Cerah"}
         ]
     },
@@ -53,41 +56,45 @@ ships_data = [
         "name": "MT_OCEAN_PRIDE", "type": "Tanker", "lat": -6.10, "lon": 105.80, "speed": "14.2 kn", "course": 210, "eta": "14:00 UTC",
         "dest": "AUSTRALIA", "dest_pos": [-6.50, 105.50],
         "past_track": [[-5.80, 105.95], [-6.10, 105.80]],
-        "timeline": [
-            {"time": "Now", "pos": [-6.10, 105.80], "cond": "☀️ Cerah"},
-            {"time": "+30m", "pos": [-6.25, 105.70], "cond": "⛅ Berawan"}
-        ]
+        "timeline": [{"time": "Now", "pos": [-6.10, 105.80], "cond": "☀️ Cerah"}]
     }
 ]
 
 # --- 4. MAP GENERATION ---
 target_file = "CODAR_BADA_2025_04_12_1400-1744466400.nc"
 img_buf, bounds = get_shaded_radar(target_file)
-m = folium.Map(location=[-6.0, 105.9], zoom_start=11, tiles="CartoDB dark_matter")
+m = folium.Map(location=[-5.95, 105.9], zoom_start=11, tiles="CartoDB dark_matter")
 
 if img_buf:
     folium.raster_layers.ImageOverlay(np.array(PIL.Image.open(img_buf)), 
                                      bounds=[[bounds[0], bounds[1]], [bounds[2], bounds[3]]], opacity=0.7).add_to(m)
 
+# Render Pelabuhan
+for p in ports:
+    folium.Marker(
+        location=p['pos'],
+        tooltip=p['name'],
+        icon=folium.Icon(color='blue', icon='anchor', prefix='fa')
+    ).add_to(m)
+
 js_objects = []
 
 for s in ships_data:
-    # 1. Past Track (Garis Oranye)
+    # Logic ETA: Hanya muncul jika tujuan adalah Pelabuhan Utama
+    main_ports = ["MERAK", "BAKAUHENI", "BOJONEGARA"]
+    eta_display = s['eta'] if s['dest'].upper() in main_ports else "N/A (Ocean Route)"
+    
+    # Past Track & Expected Route (Dash)
     folium.PolyLine(locations=s['past_track'], color="#e67e22", weight=3, opacity=0.8).add_to(m)
-
-    # 2. Waypoint Group (Sembunyi di awal)
-    wp_group = folium.FeatureGroup(name=f"wp_{s['name']}", show=False).add_to(m)
-    for wp in s['timeline']:
-        folium.Marker(
-            location=wp['pos'],
-            icon=folium.DivIcon(html=f'<div style="background:white; border-radius:4px; padding:2px; border:1px solid cyan; text-align:center; width:32px; font-size:14px;">{wp["cond"].split()[0]}</div>')
-        ).add_to(wp_group)
-
-    # 3. Expected Route (Garis Putus-putus Biru)
     route = folium.PolyLine(locations=[[s['lat'], s['lon']], s['dest_pos']], 
                             color="#3498db", weight=3, opacity=0.7, dash_array='10, 10').add_to(m)
 
-    # Popup Content
+    # Waypoint Group
+    wp_group = folium.FeatureGroup(name=f"wp_{s['name']}", show=False).add_to(m)
+    for wp in s['timeline']:
+        folium.Marker(location=wp['pos'], icon=folium.DivIcon(html=f'<div style="background:white; border-radius:4px; padding:2px; border:1px solid cyan; text-align:center; width:32px; font-size:14px;">{wp["cond"].split()[0]}</div>')).add_to(wp_group)
+
+    # Popup HTML
     t_rows = "".join([f"<tr><td><b>{i['time']}</b></td><td>: {i['cond']}</td></tr>" for i in s['timeline']])
     p_html = f"""<div style="font-family: Arial; width: 220px; font-size: 11px;">
         <b style="color: #2980b9; font-size: 14px;">{s['name'].replace('_',' ')}</b><br>{s['type']}<hr style="margin:4px 0;">
@@ -95,12 +102,11 @@ for s in ships_data:
             <tr><td>Speed</td><td>: {s['speed']}</td></tr>
             <tr><td>Course</td><td>: {s['course']}°</td></tr>
             <tr><td>Tujuan</td><td>: {s['dest']}</td></tr>
-            <tr><td>ETA</td><td>: {s['eta']}</td></tr>
+            <tr><td>ETA</td><td>: {eta_display}</td></tr>
         </table>
         <hr style="margin:4px 0;"><b>Route Forecast:</b>
         <table style="width: 100%; margin-top:5px;">{t_rows}</table></div>"""
 
-    # Marker Kapal
     marker = folium.Marker(
         location=[s['lat'], s['lon']],
         popup=folium.Popup(p_html, max_width=250),
@@ -109,7 +115,7 @@ for s in ships_data:
 
     js_objects.append({"marker": marker.get_name(), "wp": wp_group.get_name(), "route": route.get_name()})
 
-# --- JAVASCRIPT INJECTION (STABLE) ---
+# --- JS INJECTION ---
 all_wp_ids = [obj['wp'] for obj in js_objects]
 all_route_ids = [obj['route'] for obj in js_objects]
 
@@ -117,16 +123,4 @@ script_content = ""
 for obj in js_objects:
     script_content += f"""
     {obj['marker']}.on('click', function() {{
-        {[f"map.removeLayer({wid});" for wid in all_wp_ids]}
-        {[f"{rid}.setStyle({{color: '#3498db', weight: 3, dashArray: '10, 10'}});" for rid in all_route_ids]}
-        map.addLayer({obj['wp']});
-        {obj['route']}.setStyle({{color: '#00f2ff', weight: 5, dashArray: null}});
-    }});
-    """
-
-m.get_root().script.add_child(folium.Element(f"""
-    var map = {m.get_name()};
-    {script_content.replace('[', '').replace(']', '').replace("'", "")}
-"""))
-
-folium_static(m, width=1550, height=900)
+        {[f"map
