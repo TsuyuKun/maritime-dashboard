@@ -36,15 +36,12 @@ def get_shaded_radar(file_path):
     except: return None, None
 
 # --- 3. DATA PELABUHAN & ARMADA ---
-# Koreksi lokasi Bojonegara
 ports = [
     {"name": "Pelabuhan Merak", "pos": [-5.93, 106.00]},
     {"name": "Pelabuhan Bakauheni", "pos": [-5.87, 105.76]},
-    {"name": "Pelabuhan Bojonegara", "pos": [-5.95, 106.09]} # Lokasi diperbaiki
+    {"name": "Pelabuhan Bojonegara", "pos": [-5.95, 106.09]}
 ]
 
-# Daftar Kapal dengan skema warna: 
-# Ferry (Cyan), Ro-Ro (Green), Tanker (Red), Cargo (Yellow), Barge (Purple), Patrol (Blue)
 ships_data = [
     {
         "name": "KMP SEBUKU", "type": "Ferry", "color": "#00f2ff", "lat": -5.89, "lon": 105.82, 
@@ -72,15 +69,13 @@ ships_data = [
     },
     {
         "name": "TK BARGE 88", "type": "Barge", "color": "#9b59b6", "lat": -6.02, "lon": 105.95, 
-        "speed": "4.5 kn", "course": 45, "eta": "N/A", "dest": "CIGADING", "dest_pos": [-6.01, 105.98],
-        "past": [[-6.05, 105.90], [-6.02, 105.95]],
-        "timeline": []
+        "speed": "4.5 kn", "course": 45, "eta": "-", "dest": "CIGADING", "dest_pos": [-6.01, 105.98],
+        "past": [], "timeline": [] # Rute dihapus
     },
     {
         "name": "KN JALAKULA", "type": "Patrol", "color": "#3498db", "lat": -5.95, "lon": 105.88, 
         "speed": "18.0 kn", "course": 330, "eta": "-", "dest": "-", "dest_pos": [-5.80, 105.80],
-        "past": [[-6.00, 105.90], [-5.95, 105.88]],
-        "timeline": []
+        "past": [], "timeline": [] # Rute dihapus
     }
 ]
 
@@ -93,30 +88,31 @@ if img_buf:
     folium.raster_layers.ImageOverlay(np.array(PIL.Image.open(img_buf)), 
                                      bounds=[[bounds[0], bounds[1]], [bounds[2], bounds[3]]], opacity=0.7).add_to(m)
 
-# Render Pelabuhan
 for p in ports:
     folium.Marker(location=p['pos'], tooltip=p['name'], icon=folium.Icon(color='blue', icon='anchor', prefix='fa')).add_to(m)
 
 js_objects = []
 
 for s in ships_data:
-    # Logic Tampilan Patrol & Pelabuhan Utama
+    # Logic Filter Rute: Barge dan Patrol tidak punya rute visual
+    has_route = s['type'] not in ["Barge", "Patrol"]
     is_patrol = (s['type'] == "Patrol")
+    
     main_ports = ["MERAK", "BAKAUHENI", "BOJONEGARA"]
     eta_val = s['eta'] if s['dest'].upper() in main_ports and not is_patrol else "-"
     dest_val = s['dest'] if not is_patrol else "-"
 
-    # Past Track & Expected Route
-    folium.PolyLine(locations=s['past'], color=s['color'], weight=2, opacity=0.5).add_to(m)
-    route = folium.PolyLine(locations=[[s['lat'], s['lon']], s['dest_pos']], 
-                            color=s['color'], weight=3, opacity=0.7, dash_array='8, 8').add_to(m)
+    route_id = "null"
+    if has_route:
+        folium.PolyLine(locations=s['past'], color=s['color'], weight=2, opacity=0.5).add_to(m)
+        route = folium.PolyLine(locations=[[s['lat'], s['lon']], s['dest_pos']], 
+                                color=s['color'], weight=3, opacity=0.7, dash_array='8, 8').add_to(m)
+        route_id = route.get_name()
 
-    # Waypoint Group
     wp_group = folium.FeatureGroup(name=f"wp_{s['name']}", show=False).add_to(m)
     for wp in s['timeline']:
         folium.Marker(location=wp['pos'], icon=folium.DivIcon(html=f'<div style="background:white; border-radius:4px; padding:2px; border:2px solid {s["color"]}; text-align:center; width:30px;">{wp["cond"].split()[0]}</div>')).add_to(wp_group)
 
-    # Popup HTML
     p_html = f"""<div style="font-family: Arial; width: 200px; font-size: 11px;">
         <b style="color: {s['color']}; font-size: 13px;">{s['name']}</b><br>{s['type']}<hr style="margin:4px 0;">
         <table style="width: 100%;">
@@ -132,20 +128,22 @@ for s in ships_data:
         icon=folium.DivIcon(html=f'<div style="transform:rotate({s["course"]}deg); color:{s["color"]}; font-size:24px; cursor:pointer;">➤</div>')
     ).add_to(m)
 
-    js_objects.append({"marker": marker.get_name(), "wp": wp_group.get_name(), "route": route.get_name(), "color": s['color']})
+    js_objects.append({"marker": marker.get_name(), "wp": wp_group.get_name(), "route": route_id})
 
 # --- JS INJECTION ---
 all_wp_ids = [obj['wp'] for obj in js_objects]
-all_route_ids = [obj['route'] for obj in js_objects]
+valid_route_objects = [obj for obj in js_objects if obj['route'] != "null"]
 
 script_content = ""
 for obj in js_objects:
+    route_logic = f"{obj['route']}.setStyle({{weight: 5, dashArray: null}});" if obj['route'] != "null" else ""
+    
     script_content += f"""
     {obj['marker']}.on('click', function() {{
         {[f"map.removeLayer({wid});" for wid in all_wp_ids]}
-        {[f"{rid}.setStyle({{weight: 2, dashArray: '8, 8'}});" for rid in all_route_ids]}
+        {[f"{r['route']}.setStyle({{weight: 2, dashArray: '8, 8'}});" for r in valid_route_objects]}
         map.addLayer({obj['wp']});
-        {obj['route']}.setStyle({{weight: 5, dashArray: null}});
+        {route_logic}
     }});
     """
 
