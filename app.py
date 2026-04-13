@@ -10,7 +10,7 @@ import PIL.Image
 import plotly.graph_objects as go
 
 # --- 1. CONFIG & UI STYLING ---
-st.set_page_config(page_title="Maritime Crossing Monitor - FlightDoc", layout="wide")
+st.set_page_config(page_title="Maritime Crossing Monitor - FlightDoc", layout="wide", initial_sidebar_state="expanded")
 
 # CSS untuk tampilan Command Center Profesional
 st.markdown("""
