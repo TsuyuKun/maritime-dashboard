@@ -39,7 +39,7 @@ def get_shaded_radar(file_path):
 ports = [
     {"name": "Pelabuhan Merak", "pos": [-5.93, 106.00]},
     {"name": "Pelabuhan Bakauheni", "pos": [-5.87, 105.76]},
-    {"name": "Pelabuhan Bojonegara", "pos": [-5.975, 106.10]}
+    {"name": "Pelabuhan Bojonegara", "pos": [-5.975, 106.11]}
 ]
 
 ships_data = [
@@ -137,7 +137,25 @@ for s in ships_data:
     marker = folium.Marker(
         location=[s['lat'], s['lon']],
         popup=folium.Popup(p_html, max_width=250),
-        icon=folium.DivIcon(html=f'<div style="transform:rotate({s["course"]}deg); color:{s["color"]}; font-size:24px; cursor:pointer;">➤</div>')
+        icon=folium.DivIcon(
+            # Gunakan icon_size dan icon_anchor untuk menghilangkan gap
+            icon_size=(30, 30),
+            icon_anchor=(15, 15), 
+            html=f"""
+                <div style="
+                    transform: rotate({s['course']}deg); 
+                    color: {s['color']}; 
+                    font-size: 24px; 
+                    width: 30px; 
+                    height: 30px; 
+                    display: flex; 
+                    justify-content: center; 
+                    align-items: center; 
+                    cursor: pointer;">
+                    ➤
+                </div>
+            """
+        )
     ).add_to(m)
 
     js_objects.append({"marker": marker.get_name(), "wp": wp_group.get_name(), "route": route_id})
