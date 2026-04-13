@@ -45,7 +45,7 @@ ports = [
 ships_data = [
     {
         "name": "KMP SEBUKU", "type": "Ferry", "color": "#00f2ff", "lat": -5.89, "lon": 105.82, 
-        "speed": "10.8 kn", "course": 355, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
+        "speed": "10.8 kn", "course": 359, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
         "past": [[-5.87, 105.77], [-5.89, 105.82]],
         "timeline": [
             {"time": "10:30", "pos": [-5.90, 105.86], "cond": "🌧️ Hujan"},
@@ -59,6 +59,27 @@ ships_data = [
         "speed": "12.5 kn", "course": 200, "eta": "10:45 UTC", "dest": "BAKAUHENI", "dest_pos": [-5.87, 105.76],
         "past": [[-5.93, 106.00], [-5.91, 105.90]],
         "timeline": [{"time": "10:30", "pos": [-5.89, 105.83], "cond": "🌧️ Hujan"}, {"time": "10:45", "pos": [-5.87, 105.76], "cond": "☁️ Tebal"}]
+    },
+    "name": "CAO NI MA 2", 
+        "type": "Cargo", 
+        "color": "#f1c40f", 
+        "lat": -5.97, 
+        "lon": 106.12, 
+        "speed": "10.5 kn", 
+        "course": 35, 
+        "eta": "N/A", 
+        "dest": "SHENZHEN (CHN)", 
+        "dest_pos": [-5.80, 106.30], # Heading NE towards South China Sea
+        "past": [
+            [-5.975, 106.11], # Bojonegara Port
+            [-5.97, 106.12]
+        ],
+        "timeline": [
+            {"time": "12:00", "pos": [-5.97, 106.12], "cond": "☀️ Cerah"},
+            {"time": "12:15", "pos": [-5.94, 106.15], "cond": "☀️ Cerah"},
+            {"time": "12:30", "pos": [-5.91, 106.18], "cond": "⛅ Berawan"},
+            {"time": "12:45", "pos": [-5.88, 106.21], "cond": "⛅ Berawan"}
+        ]
     },
     {
         "name": "MT OCEAN PRIDE", 
