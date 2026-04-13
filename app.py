@@ -44,8 +44,8 @@ ports = [
 
 ships_data = [
     {
-        "name": "KMP SEBUKU", "type": "Ferry", "color": "#00f2ff", "lat": -5.89, "lon": 105.82, 
-        "speed": "10.8 kn", "course": 340, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
+        "name": "KMP SEBUKU", "type": "Ferry", "color": "#00f2ff", "lat": -5.85, "lon": 105.82, 
+        "speed": "10.8 kn", "course": 355, "eta": "11:15 UTC", "dest": "MERAK", "dest_pos": [-5.93, 106.00],
         "past": [[-5.87, 105.77], [-5.89, 105.82]],
         "timeline": [
             {"time": "10:30", "pos": [-5.90, 105.86], "cond": "🌧️ Hujan"},
@@ -55,7 +55,7 @@ ships_data = [
         ]
     },
     {
-        "name": "MV PORTLINK", "type": "Ro-Ro", "color": "#2ecc71", "lat": -5.91, "lon": 105.90, 
+        "name": "MV PORTLINK", "type": "Ro-Ro", "color": "#2ecc71", "lat": -5.86, "lon": 105.90, 
         "speed": "12.5 kn", "course": 200, "eta": "10:45 UTC", "dest": "BAKAUHENI", "dest_pos": [-5.87, 105.76],
         "past": [[-5.93, 106.00], [-5.91, 105.90]],
         "timeline": [{"time": "10:30", "pos": [-5.89, 105.83], "cond": "🌧️ Hujan"}, {"time": "10:45", "pos": [-5.87, 105.76], "cond": "☁️ Tebal"}]
@@ -74,7 +74,7 @@ ships_data = [
         "past": [
             [1.29, 103.85],   # Keberangkatan: Singapura
             [-5.50, 105.90],  # Titik transit Selat Sunda Utara
-            [-6.00, 105.85], 
+            [-6.00, 105.80], 
             [-6.10, 105.80]
         ],
         "timeline": [
@@ -83,16 +83,6 @@ ships_data = [
             {"time": "12:30", "pos": [-6.45, 105.55], "cond": "🌧️ Hujan Ringan"},
             {"time": "12:45", "pos": [-6.55, 105.48], "cond": "☀️ Cerah"}
         ]
-    },
-    {
-        "name": "KM LOGISTIK 1", "type": "Cargo", "color": "#f1c40f", "lat": -5.98, "lon": 106.05, 
-        "speed": "9.0 kn", "course": 180, "eta": "12:00 UTC", "dest": "BOJONEGARA", "dest_pos": [-5.95, 106.09],
-        "past": [[-6.05, 106.05], [-5.98, 106.05]],
-        "timeline": [{"time": "11:30", "pos": [-5.97, 106.07], "cond": "☁️ Tebal"}]
-    },
-    {
-        "name": "TK BARGE 88", "type": "Barge", "color": "#9b59b6", "lat": -6.02, "lon": 105.95, "speed": "4.5 kn", "course": 45, "eta": "-", "dest": "CIGADING", "dest_pos": [-6.01, 105.98],
-        "past": [], "timeline": []
     },
     {
         "name": "KN JALAKULA", "type": "Patrol", "color": "#3498db", "lat": -5.95, "lon": 105.88, "speed": "18.0 kn", "course": 330, "eta": "-", "dest": "-", "dest_pos": [-5.80, 105.80],
