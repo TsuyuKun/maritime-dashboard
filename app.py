@@ -7,7 +7,7 @@ from streamlit_folium import folium_static
 import PIL.Image
 from io import BytesIO
 
-# --- 1. CONFIG: FULLSCREEN & CLEAN ---
+# --- 1. CONFIG ---
 st.set_page_config(page_title="Maritime FlightDoc Pro", layout="wide")
 
 st.markdown("""
@@ -17,32 +17,31 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. DATA ENGINE (SHADED RADAR) ---
+# --- 2. DATA ENGINE ---
 @st.cache_data
 def get_shaded_radar(file_path):
     try:
         ds = xr.open_dataset(file_path)
-        # Fokus Selat Sunda sesuai rute KMP Sebuku
         ds_clipped = ds.sel(lat=slice(-6.5, -5.5), lon=slice(105.0, 107.0))
         lon, lat = ds_clipped.lon.values, ds_clipped.lat.values
         speed = np.sqrt(ds_clipped.u.isel(time=0).values**2 + ds_clipped.v.isel(time=0).values**2)
         
         fig, ax = plt.subplots(figsize=(10, 10))
         fig.subplots_adjust(0,0,1,1); ax.axis('off')
-        # Shaded plot menggunakan interpolation bilinear agar halus
         ax.imshow(speed, extent=[lon.min(), lon.max(), lat.min(), lat.max()], 
                    origin='lower', cmap='turbo', alpha=0.6, interpolation='bilinear')
         
         buf = BytesIO(); plt.savefig(buf, format='png', transparent=True, dpi=150); plt.close(fig)
         return buf, [float(lat.min()), float(lon.min()), float(lat.max()), float(lon.max())]
-    except Exception as e:
-        return None, None
+    except: return None, None
 
-# --- 3. MOCK DATA: SHIPS & TIMELINE ---
+# --- 3. MOCK DATA ---
 ships_data = [
     {
         "name": "KMP_SEBUKU", "type": "Ferry", "lat": -5.89, "lon": 105.82, "speed": "10.8 kn", "course": 115, "eta": "11:15 UTC",
         "dest": "MERAK", "dest_pos": [-5.93, 106.00],
+        # Tambahan Past Track
+        "past_track": [[-5.87, 105.77], [-5.88, 105.79], [-5.89, 105.82]],
         "timeline": [
             {"time": "10:30", "pos": [-5.90, 105.86], "cond": "🌧️ Hujan"},
             {"time": "10:45", "pos": [-5.91, 105.91], "cond": "☁️ Tebal"},
@@ -53,6 +52,7 @@ ships_data = [
     {
         "name": "MT_OCEAN_PRIDE", "type": "Tanker", "lat": -6.10, "lon": 105.80, "speed": "14.2 kn", "course": 210, "eta": "14:00 UTC",
         "dest": "AUSTRALIA", "dest_pos": [-6.50, 105.50],
+        "past_track": [[-5.80, 105.95], [-6.10, 105.80]],
         "timeline": [
             {"time": "Now", "pos": [-6.10, 105.80], "cond": "☀️ Cerah"},
             {"time": "+30m", "pos": [-6.25, 105.70], "cond": "⛅ Berawan"}
@@ -72,18 +72,22 @@ if img_buf:
 js_objects = []
 
 for s in ships_data:
-    # Waypoint Group (Sembunyi di awal)
+    # 1. Past Track (Garis Oranye)
+    folium.PolyLine(locations=s['past_track'], color="#e67e22", weight=3, opacity=0.8).add_to(m)
+
+    # 2. Waypoint Group (Sembunyi di awal)
     wp_group = folium.FeatureGroup(name=f"wp_{s['name']}", show=False).add_to(m)
     for wp in s['timeline']:
         folium.Marker(
             location=wp['pos'],
-            icon=folium.DivIcon(html=f'<div style="background:white; border-radius:4px; padding:2px; border:2px solid cyan; text-align:center; width:32px; font-size:14px;">{wp["cond"].split()[0]}</div>')
+            icon=folium.DivIcon(html=f'<div style="background:white; border-radius:4px; padding:2px; border:1px solid cyan; text-align:center; width:32px; font-size:14px;">{wp["cond"].split()[0]}</div>')
         ).add_to(wp_group)
 
-    # Expected Route
-    route = folium.PolyLine(locations=[[s['lat'], s['lon']], s['dest_pos']], color="#3498db", weight=2, opacity=0.7).add_to(m)
+    # 3. Expected Route (Garis Putus-putus Biru)
+    route = folium.PolyLine(locations=[[s['lat'], s['lon']], s['dest_pos']], 
+                            color="#3498db", weight=3, opacity=0.7, dash_array='10, 10').add_to(m)
 
-    # Info Popup
+    # Popup Content
     t_rows = "".join([f"<tr><td><b>{i['time']}</b></td><td>: {i['cond']}</td></tr>" for i in s['timeline']])
     p_html = f"""<div style="font-family: Arial; width: 220px; font-size: 11px;">
         <b style="color: #2980b9; font-size: 14px;">{s['name'].replace('_',' ')}</b><br>{s['type']}<hr style="margin:4px 0;">
@@ -105,7 +109,7 @@ for s in ships_data:
 
     js_objects.append({"marker": marker.get_name(), "wp": wp_group.get_name(), "route": route.get_name()})
 
-# --- JAVASCRIPT SNAPPY TRANSITION ---
+# --- JAVASCRIPT INJECTION (STABLE) ---
 all_wp_ids = [obj['wp'] for obj in js_objects]
 all_route_ids = [obj['route'] for obj in js_objects]
 
@@ -114,9 +118,9 @@ for obj in js_objects:
     script_content += f"""
     {obj['marker']}.on('click', function() {{
         {[f"map.removeLayer({wid});" for wid in all_wp_ids]}
-        {[f"{rid}.setStyle({{color: '#3498db', weight: 2}});" for rid in all_route_ids]}
+        {[f"{rid}.setStyle({{color: '#3498db', weight: 3, dashArray: '10, 10'}});" for rid in all_route_ids]}
         map.addLayer({obj['wp']});
-        {obj['route']}.setStyle({{color: '#00f2ff', weight: 5}});
+        {obj['route']}.setStyle({{color: '#00f2ff', weight: 5, dashArray: null}});
     }});
     """
 
